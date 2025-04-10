@@ -76,7 +76,7 @@ def choose_prefix(row,
     return closest_prefix
 
 
-def correct_rounds_from_lookup(df, visit_order_lookup, round_column='round'):
+def correct_rounds_from_lookup(df, round_column='round'):
     '''
     If no exact match is found in choose_prefix() and the midpoints are used to determine the closest visit,
     it is recommended to check the visit order and correct possible mistakes. This could be the case, especially for: RS-I-1, RS-II-2, RS-II-3. 
