@@ -78,8 +78,8 @@ def choose_prefix(row,
 
 def correct_rounds_from_lookup(df, visit_order_lookup, round_column='round'):
     '''
-    If not exact match is found in choose_prefix() and the midpoints are used to determine the closest visit,
-    it is recommended to check the visit order and correct possible mistakes for RS-I-1, RS-II-2, RS-II-3. 
+    If no exact match is found in choose_prefix() and the midpoints are used to determine the closest visit,
+    it is recommended to check the visit order and correct possible mistakes. This could be the case, especially for: RS-I-1, RS-II-2, RS-II-3. 
     '''
     df_ = df.copy()
     df_ = df_.sort_values(['ergo_id', 'study_id', 'visit_date'])
