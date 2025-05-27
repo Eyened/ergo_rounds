@@ -1,7 +1,7 @@
 import pickle 
 import pandas as pd
 import numpy as np
-    
+from dataclasses import dataclass
 
 date_ranges = {('1989-07-01', '1993-09-01', 'Rotterdam Study 1'): ('e1', 1),  # Value = ergo nr. , follow-up nr.
                ('1993-09-02', '1995-12-31', 'Rotterdam Study 1'): ('e2', 2), 
@@ -30,18 +30,42 @@ visit_order_lookup = {
 date_ranges = {(pd.to_datetime(start), pd.to_datetime(end), project_name): value for (start, end, project_name), value in date_ranges.items()}
 
 
-def choose_prefix(row, 
-                  date_column='visit_date', 
-                  study_column='study_id',
-                  visit_number_column='visit_nr'):
+@dataclass
+class ColumnConfig:
+    id_column: str = 'ergo_id'
+    date_column: str = 'visit_date'
+    study_column: str = 'study_id'
+    visit_number_column: str = 'visit_nr'
+    round_column: str = 'round'
     
+    
+
+def choose_prefix(row, config: ColumnConfig):
     '''
-    Choose the correct round prefix from the date_ranges (dct) from -ergo wiki-, based on the visit number and the cohort name.
-    If no match is found for the current visit, then proceed with other checks:
-    2) Check the distance to the midpoint of the current visit 
-    3) Check the distance to the midpoint of the next visit 
-    4) If 2) and 3) are not within the threshold of 3 years, check all the dates. Multiple visits are missing
+    Determines the appropriate round prefix for a participant's visit based on visit date, study cohort,
+    and visit number using predefined `date_ranges`.
+
+    Args:
+        row (pd.Series): A single row from a DataFrame.
+        config (ColumnConfig): Configuration class with column names for flexible usage.
+
+    Returns:
+        str: The corresponding prefix (e.g., 'e4', 'ep', etc.), or the closest match if no exact range match is found.
+
+    Logic:
+        1. Attempt exact match on date range, cohort name, and visit number.
+        2. If no exact match:
+            a. Check distance to midpoint of the current visit range.
+            b. If still unmatched, check distance to midpoint of the next visit.
+            c. If still unmatched and above a 3-year threshold, search all midpoints within the same cohort.
+        
+    Usage Example:
+        df['round'] = df.apply(lambda row: choose_prefix(row, config), axis=1)
     '''
+    # Load ColumnConfig
+    date_column = config.date_column
+    study_column = config.study_column
+    visit_number_column = config.visit_number_column
     
     closest_distance = float('inf')
     closest_distance_threshold = 1096 # 3 years 
@@ -90,16 +114,40 @@ def choose_prefix(row,
     return closest_prefix
 
 
-def correct_rounds_from_lookup(df, id_column='ergo_id', round_column='round'):
+def correct_rounds_from_lookup(df, config: ColumnConfig):
     '''
-    If no exact match is found in choose_prefix() and the midpoints are used to determine the closest visit,
-    it is recommended to check the visit order. This could be the case, especially for: RS-I-1, RS-II-2, RS-II-3. 
-    This function checks for duplicated rounds and corrects them using the visit_order_lookup
-    '''
-    df_ = df.copy()
-    df_ = df_.sort_values([id_column, 'study_id', 'visit_date'])
+    Resolves duplicated round prefixes for individual participants by correcting them based on expected visit order.
 
-    for (ergo_id, study_id), group in df_.groupby([id_column, 'study_id']):
+    This is useful when choose_prefix() falls back to midpoint-based assignment, which may cause duplicates
+    for certain cases like RS-I-1, RS-II-2, RS-II-3, etc.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing participant visit information.
+        config (ColumnConfig): Configuration class specifying column names.
+
+    Returns:
+        pd.DataFrame: DataFrame with corrected round values where duplicates are resolved.
+
+    Logic:
+        - Sort visits by ID, study, and date.
+        - For each participant/study combination, detect duplicated rounds.
+        - For each duplicated round, correct the first occurrence using the (study, visit_nr) -> prefix mapping.
+
+    Usage Example:
+        df_corrected = correct_rounds_from_lookup(df, config)
+    '''
+    # Load config
+    id_column = config.id_column
+    round_column = config.round_column
+    date_column = config.date_column
+    study_column = config.study_column
+    visit_number_column = config.visit_number_column
+
+    
+    df_ = df.copy()
+    df_ = df_.sort_values([id_column, study_column, date_column])
+
+    for (ergo_id, study_id), group in df_.groupby([id_column, study_column]):
         round_counts = group[round_column].value_counts()
         duplicated_rounds = round_counts[round_counts > 1].index.tolist()
 
@@ -107,10 +155,10 @@ def correct_rounds_from_lookup(df, id_column='ergo_id', round_column='round'):
         # Sort them by visit_nr to find the one to correct
         for dup_round in duplicated_rounds:
             round_rows = group[group[round_column] == dup_round]
-            round_rows = round_rows.sort_values('visit_nr')
+            round_rows = round_rows.sort_values(visit_number_column)
 
             first_idx = round_rows.index[0]
-            visit_nr = df_.at[first_idx, 'visit_nr']
+            visit_nr = df_.at[first_idx, visit_number_column]
 
             # Look up what the correct round should have been
             corrected = visit_order_lookup.get((study_id, visit_nr))

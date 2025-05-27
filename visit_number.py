@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from collections import defaultdict
 
-from ergo_round import date_ranges
+from ergo_round import date_ranges, ColumnConfig
 
 # Construct a lookup mapping each study name to an ordered list of visit prefixes
 # Ordered by visit number. Depends on: data_ranges(dict).
@@ -13,7 +13,7 @@ for (start_date, end_date, study_name), (prefix, visit_number) in sorted(
     cohort_prefix_order_lookup[study_name].append(prefix)
 
 
-def get_visit_number(row: pd.Series) -> int | None:
+def get_visit_number(row: pd.Series, config: ColumnConfig) -> int | None:
     """
     Retrieve the visit number for a given row based on the study ID and prefix.
 
@@ -28,8 +28,11 @@ def get_visit_number(row: pd.Series) -> int | None:
         The visit number (1-based index) corresponding to the prefix within the study,
         or None if the prefix is not found.
     """
-    study_prefixes = cohort_prefix_order_lookup.get(row['study_id'], [])
+    study_column = config.study_column
+    prefix_column = config.round_column  # Assuming 'round' column holds the prefix
+
+    study_prefixes = cohort_prefix_order_lookup.get(row[study_column], [])
     try:
-        return study_prefixes.index(row['prefix']) + 1
+        return study_prefixes.index(row[prefix_column]) + 1
     except ValueError:
         return None
