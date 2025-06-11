@@ -84,25 +84,7 @@ def choose_prefix(row, config: ColumnConfig):
     study_id = row[study_column]
     visit_nr = row[visit_number_column]
 
-    # 2. Check distances to midpoint of current visit
-    for (start_date, end_date, project_name), (prefix, visit_number) in date_ranges.items():
-        if project_name == study_id and visit_number == visit_nr:
-            midpoint = start_date + (end_date - start_date) / 2
-            distance = abs((visit_date - midpoint).days)
-            if distance < closest_distance:
-                closest_distance = distance
-                closest_prefix = prefix
-
-    # 3. Check distances to midpoint of next visit
-    for (start_date, end_date, project_name), (prefix, visit_number) in date_ranges.items():
-        if project_name == study_id and visit_number == visit_nr + 1:
-            midpoint = start_date + (end_date - start_date) / 2
-            distance = abs((visit_date - midpoint).days)
-            if distance < closest_distance:
-                closest_distance = distance
-                closest_prefix = prefix 
-
-    # 4. Check distances to midpoint for all visits
+    # 2. Check distances to midpoint for all visits
     if closest_distance > closest_distance_threshold:  # 5 years in days
         for (start_date, end_date, project_name), (prefix, visit_number) in date_ranges.items():
             if project_name == study_id:
